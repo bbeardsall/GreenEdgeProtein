@@ -10,6 +10,18 @@ Testing Mireille.
 Brian's changes.
 Mireille trying
 
+- set < 0 values to NA (protein)
+- Fcp6SpeciesPlot aMean fmol_ugChlA (do for all all targets) (confirm if up to date)
+- look through notes
+- ran out of shapes (line 792)
+- line 796 keep old 
+- shiny interactive plot
+  - species
+  - blot id
+  - Dany excel tab
+  
+Test branch switch
+
 This .Rmd RNotebook imports a metadata Catalog  with information on samples.
 
 It imports blot data in .csv form saved in a folder after export from BioRad software based upon project specific values for variables set by the user.
