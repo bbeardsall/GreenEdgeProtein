@@ -5,7 +5,6 @@ date: "`r format(Sys.Date())`"
 #output: html_notebook
 ---
 Changes for Brian to implement:
-- set < 0 values to NA (protein)
 - Fcp6SpeciesPlot aMean fmol_ugChlA (do for all all targets) (confirm if up to date)
 - look through notes
 - ran out of shapes (line 792)
