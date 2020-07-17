@@ -8,6 +8,7 @@ This is a test of github.
 Another test message.
 Testing Mireille.
 Brian's changes.
+Mireille trying
 
 This .Rmd RNotebook imports a metadata Catalog  with information on samples.
 
