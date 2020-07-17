@@ -7,6 +7,7 @@ date: "`r format(Sys.Date())`"
 This is a test of github.
 Another test message.
 Testing Mireille.
+Brian's changes.
 
 This .Rmd RNotebook imports a metadata Catalog  with information on samples.
 
