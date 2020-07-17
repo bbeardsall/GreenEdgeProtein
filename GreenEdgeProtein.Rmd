@@ -4,6 +4,8 @@ author: "Douglas A. Campbell"
 date: "`r format(Sys.Date())`"
 #output: html_notebook
 ---
+Test github.
+
 This .Rmd RNotebook imports a metadata Catalog  with information on samples.
 
 It imports blot data in .csv form saved in a folder after export from BioRad software based upon project specific values for variables set by the user.
