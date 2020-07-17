@@ -4,12 +4,7 @@ author: "Douglas A. Campbell"
 date: "`r format(Sys.Date())`"
 #output: html_notebook
 ---
-This is a test of github.
-Another test message.
-Testing Mireille.
-Brian's changes.
-Mireille trying
-
+Changes for Brian to implement:
 - set < 0 values to NA (protein)
 - Fcp6SpeciesPlot aMean fmol_ugChlA (do for all all targets) (confirm if up to date)
 - look through notes
@@ -19,8 +14,6 @@ Mireille trying
   - species
   - blot id
   - Dany excel tab
-  
-Test branch switch
 
 This .Rmd RNotebook imports a metadata Catalog  with information on samples.
 
@@ -490,6 +483,12 @@ for(i in 1:nrow(Nested)) {
   ProteinData <- bind_rows(ProteinData, FittedData)
 }
 
+# drop all negative predicted values 
+# use ifelse not if_else since NA and double are different types 
+ProteinData <- ProteinData %>%
+  mutate(pred = ifelse(pred < 0, NA, pred)) %>%
+  drop_na(pred)
+
 # keep only useful info from plate data
 LongProteinData <- ProteinData %>%
   # only keep samples (starts with P)
@@ -940,56 +939,6 @@ lm(TotalProteinExtract_ug ~ TotalChlaExtract_ug, data = Data)
 ```
 ```{r no Natalie unforced int}
 lm(TotalProteinExtract_ug ~ TotalChlaExtract_ug, data = Data)
-```
-
-```{r OLD plot protein quant vs. experimental conditions}
-# # List target proteins, which conditions to plot, protein normalize methods
-# Targets <- c("Fcp6", "PsbA")
-# Conditions <- c("Stress_h", "Stress_h")
-# NormalizeMethods <- c("fmol_mL", "fmol_ugChla", "fmol_ugTotalProtein")
-# 
-# 
-# # initialize lists, counter
-# PlotList <- list()
-# DataList <- list()
-# PlotCount <- 1
-# 
-# # loop through target proteins
-# for(i in 1:length(Targets)){
-#   # select corresponding condition
-#   Condition <- sym(Conditions[i])
-#   
-#   # format/select data for plotting
-#   Data <- TargetProteinReport %>%
-#     #mutate(Stress_h = factor(Stress_h, levels = c("0", "0.5", "2", "1R"))) %>%
-#     filter(Target == Targets[i],
-#            !is.na(!!Condition))
-#   # Add to list of plotting data
-#   DataList[[i]] <- Data
-#   
-#   # loop through methods of normalizing protein amount
-#   for(j in 1:length(NormalizeMethods)){
-#     NormalizeMethod <- sym(NormalizeMethods[j])
-#     Plot <- ggplot(Data) +
-#       
-#       geom_point(aes(x= !!Condition, y= !!NormalizeMethod, 
-#                  colour = Inhibitor, shape = as.factor(BlotId))) +
-#       geom_vline(xintercept = 2, color = "red", size = 0.25) +
-#   # facet wrap if stress_h is on x axis
-#       {if(Conditions[i] == "Stress_h")facet_wrap(vars(CultureId))}+
-#       theme_bw() +
-#       labs(title = paste("Reported", Targets[i], 
-#                          NormalizeMethods[j], "harvested"))
-#       print(Plot)
-#   
-#   # add plot to list, with informative name
-#   PlotList[[PlotCount]] <- Plot
-#   names(PlotList)[PlotCount] <- paste(Targets[i], Conditions[i],
-#                                             NormalizeMethods[j], sep = "_")
-#   # advance plot counter
-#   PlotCount <- PlotCount + 1
-#   }
-# }
 ```
 
 Next want to do the same light stress plots, but for each species.
