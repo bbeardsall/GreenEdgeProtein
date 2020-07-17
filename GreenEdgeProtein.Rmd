@@ -4,7 +4,7 @@ author: "Douglas A. Campbell"
 date: "`r format(Sys.Date())`"
 #output: html_notebook
 ---
-Test github.
+This is a test of github.
 
 This .Rmd RNotebook imports a metadata Catalog  with information on samples.
 
