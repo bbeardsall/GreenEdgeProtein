@@ -5,6 +5,7 @@ date: "`r format(Sys.Date())`"
 #output: html_notebook
 ---
 This is a test of github.
+Another test message.
 
 This .Rmd RNotebook imports a metadata Catalog  with information on samples.
 
