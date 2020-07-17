@@ -1,0 +1,199 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# if(!require("devtools")) install.packages("devtools")
+# devtools::install_github("briandconnelly/softermax", build_vignettes = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(softermax)
+library(readxl)
+library(broom)
+library(modelr)
+```
+
+```{r}
+MetaFile <- "PlateRawData/20200625BCA_Meta.xlsx"
+PlateXMLFile <- "PlateRawData/20200625BCA.xml"
+
+XMLData <- read_softmax_xml(PlateXMLFile)
+PlateRead <- as.data.frame(XMLData)
+
+PlateRead
+```
+
+```{r}
+# initialize catalog to be appended to
+Meta <- NULL
+MetaSheets <- readxl::excel_sheets(MetaFile)
+
+# loop through excel sheets
+for(sheet in MetaSheets){
+  #readxl::read_xlsx(MetaFile, sheet = sheet, n_max = 1)
+  MetaPlateName <- names(readxl::read_xlsx(MetaFile, sheet = sheet, n_max = 1))[1] 
+
+  Data <- readxl::read_xlsx(MetaFile, sheet = sheet, skip = 1) %>%
+  mutate_all(as.character) %>%
+  pivot_longer(-Row, names_to = "Column", values_to = "SampleName") %>%
+  mutate(Well = paste(Row, Column, sep = ""),
+         PlateBaseName = MetaPlateName) %>%
+    filter(!is.na(SampleName))
+  print(MetaPlateName)
+  
+  Meta <- bind_rows(Meta, Data)
+}
+
+Meta
+```
+
+
+```{r}
+BlankSubtracted <- PlateRead %>%
+  mutate(WellType = if_else(grepl("^Blank", Plate), "Blank", "Sample"),
+         PlateBaseName = gsub("^Blank", "", Plate)) %>%
+  select("Wavelength", "WellType", "Well", "Value", "PlateBaseName") %>%
+  pivot_wider(names_from = WellType, values_from = Value, names_prefix = "Value") %>%
+  mutate(BlankSubtractedValue = ValueSample - ValueBlank)
+
+BlankSubtracted
+```
+
+
+```{r}
+Joined <- left_join(Meta, BlankSubtracted, by = c("Well", "PlateBaseName")) %>%
+  mutate(SampleType = if_else(grepl("^P", SampleName), "Unknown", "Standard"))
+
+Joined 
+```
+
+```{r}
+FilterStds <- function(Data) {
+  Data %>%
+    filter(SampleType == "Standard") %>%
+    mutate(SampleName = as.numeric(SampleName))
+}
+
+FitStdCurves <- function(Data) {
+  lm(SampleName ~ BlankSubtractedValue, data = Data)
+}
+
+GetRsq <- function(Model) {
+  broom::glance(Model)$r.squared
+}
+
+```
+
+
+
+```{r}
+Nested <- Joined %>%
+  group_by(PlateBaseName) %>%
+  nest() %>%
+  mutate(StdData = map(data, FilterStds)) %>%
+  mutate(Model = map(StdData, FitStdCurves)) %>%
+  mutate(Rsq = map(Model, GetRsq)) %>%
+  mutate_at("Rsq", unlist)
+  
+Nested
+```
+
+
+
+
+```{r}
+ProteinData <- NULL
+
+for(i in 1:nrow(Nested)) {
+  Data <- Nested$data[i][[1]]
+  Model <- Nested$Model[i][[1]]
+  
+  FittedData <- Data %>%
+    modelr::add_predictions(Model)
+  
+  ProteinData <- bind_rows(ProteinData, FittedData)
+}
+
+LongProteinData <- ProteinData %>%
+  filter(grepl("^P", SampleName)) %>%
+  select(SampleName, "Protein_mg_mL" = pred) %>%
+  arrange(SampleName)
+LongProteinData
+```
+
+
+```{r}
+WideProteinData <- LongProteinData %>%
+  mutate(across(SampleName, make.unique)) %>%
+  #mutate(LongName = if_else(grepl("\\..$", SampleName), SampleName, paste(SampleName, "0", sep = "."))) %>%
+  separate(SampleName, c("SampleName", "Replicate"), sep = "\\.") %>%
+  mutate(Replicate = if_else(is.na(Replicate), "0", Replicate)) %>%
+  pivot_wider(names_from = Replicate, values_from = Protein_mg_mL)
+WideProteinData
+  
+```
+
+
+```{r}
+Nested$FittedData[1]
+```
+
+
+```{r}
+FittedData <- Joined %>%
+  modelr::add_predictions(StdModel)
+```
+
+```{r}
+FittedData
+```
+
+```{r}
+StdPlot <- ProteinData %>%
+  mutate(SampleName = as.numeric(SampleName)) %>%
+  filter(SampleType == "Standard") %>%
+  ggplot()+
+  theme_bw()+
+  geom_point(aes(x = BlankSubtractedValue , y = SampleName)) +
+  geom_line(aes(x = BlankSubtractedValue, y = pred), color = "red")
+StdPlot
+```
+```{r}
+FittedData %>%
+  #mutate(SampleName = as.numeric(SampleName)) %>%
+  filter(SampleType == "Unknown")
+```
+
+```{r}
+FittedData %>%
+  arrange(pred)
+```
+
+```{r}
+UnknownPlot <- FittedData %>%
+  #mutate(SampleName = as.numeric(SampleName)) %>%
+  #filter(SampleType == "Unknown") %>%
+  ggplot()+
+  theme_bw()+
+  #geom_point(aes(x = BlankSubtractedValue , y = SampleName)) +
+  geom_point(aes(x = BlankSubtractedValue, y = pred, color = SampleType))
+UnknownPlot
+```
+
+```{r}
+SampleData <- FittedData %>%
+  filter(SampleType == "Unknown") %>%
+  arrange(SampleName) %>%
+  group_by(SampleName) %>%
+  summarise(Mean_fmol = mean(pred),
+            SD_fmol = sd(pred))
+
+SampleData
+```
+```{r}
+
+```
+
