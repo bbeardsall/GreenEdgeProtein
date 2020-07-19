@@ -403,8 +403,6 @@ for(MetaFile in MetaFiles){
     Meta <- bind_rows(Meta, Data)
   }
 }
-
-Meta
 ```
 
 ```{r subtract blanks}
@@ -419,7 +417,6 @@ BlankSubtracted <- PlateRead %>%
   # subtract blank from each sample
   mutate(BlankSubtractedValue = ValueSample - ValueBlank)
 
-BlankSubtracted
 ```
 
 ```{r join plate values with metadata}
@@ -427,7 +424,6 @@ JoinedProtein <- left_join(Meta, BlankSubtracted, by = c("Well", "PlateBaseName"
   # If sample starts with "P", classify as Unknown, otherwise classify as Standard
   mutate(SampleType = if_else(grepl("^P", SampleName), "Unknown", "Standard"))
 
-JoinedProtein
 ```
 
 ```{r functions for mapping}
@@ -500,8 +496,6 @@ LongProteinData <- ProteinData %>%
          StdDev = sd(Protein_ug_uL)) %>%
   ungroup() %>%
   arrange(SampleName)
-
-LongProteinData
 ```
 
 ```{r long to wide}
@@ -522,24 +516,6 @@ WideProteinData <- LongProteinData %>%
   select(SampleName, TotalProtRep1 = "0", 
          TotalProtRep2 = "1", TotalProtRep3 = "2",
          AvgTotalProt, CV, StdDev, PlateBaseName)
-
-WideProteinData
-```
-
-```{r}
-WideProteinData
-```
-
-```{r}
-BlotQuantData %>%
-  filter(Sample == "P71")
-```
-
-```{r}
-test1 <- c("a", "b", "c")
-test2 <- c(NA, "d", "e")
-
-coalesce(test1, test2)
 ```
 
 ```{r join protein data with BlotQuantData}
@@ -575,11 +551,6 @@ BlotQuantData <- BlotQuantData %>%
   mutate(TotalProteinLoaded_ug = AverageTotalProteinExtract_ug_uL * ExtractLoaded_uL,
          TotalProteinExtract_ug = AverageTotalProteinExtract_ug_uL * ExtractVolume_uL,
          TotalChlaExtract_ug = TotalChla_ug)
-  
-  
-BlotQuantData %>%
-  filter(grepl("^P", Sample)) %>%
-  select(Sample, TotalProteinLoaded_ug, ManualTotalProteinLoaded_ug)
 ```
 
 
@@ -615,14 +586,6 @@ BlotQuantData <- BlotQuantData %>%
          Exp_fmol_ugChla = Exp_fmol_lane * 1/as.numeric(ChlaLoaded_ug), na.rm = TRUE)
 ```
 
-```{r}
-BlotQuantData %>%
-  filter(Sample %in% c("P357", "P376", "P379", "P382")) %>%
-  select(Sample, TotalChla_ug, TotalChlaDany_ug, 
-         ChlaLoaded_ug)
-```
-
-
 Mireille added this
 ```{r fmol target per ug total protein}
 BlotQuantData <- BlotQuantData %>%
@@ -637,13 +600,6 @@ BlotQuantData <- BlotQuantData %>%
 mutate(TotalProtein_ug_mLHarvest = as.numeric(AverageTotalProteinExtract_ug_uL) * as.numeric(ExtractVolume_uL)* 1/(`Harvest_mL`), na.rm = TRUE)
 ```
 
-```{r}
-BlotQuantData %>%
-  select(Sample, `Harvest_mL`) %>%
-  filter(Sample == "P71")
-```
-
-
 ```{r save BlotQuantData}
 saveRDS(BlotQuantData, file = file.path(DataOut,paste(Project, "BlotQuantData", ".Rds",sep = "_"),fsep = .Platform$file.sep))
 
@@ -653,10 +609,6 @@ ggsave(filename = file.path(DataOut, paste(Project, "QuantLinPlot.png", sep = "_
 
 ggsave(filename = file.path(DataOut, paste(Project, "QuantExpPlot.png", sep = "_"),fsep = .Platform$file.sep), device = "png", plot = QuantExpPlot)
 ```
-
-
-
-
 
 ```{r compile a condensed report}
 #Filter Samples starting with "P[1-9]" (all samples beginning with "P" followed immediately by a numeral).
@@ -715,6 +667,9 @@ TargetProteinReport <- BlotQuantData %>%
 ```{r saves TargetProteinReport}
 
 saveRDS(TargetProteinReport, file = file.path(DataOut,paste(Project, "TargetProteinReport", ".Rds",sep = "_"),fsep = .Platform$file.sep))
+
+# also save RDS file to shiny folder
+saveRDS(TargetProteinReport, file = file.path("ShinyGreenEdge", "data", paste(Project, "TargetProteinReport", ".Rds",sep = "_"),fsep = .Platform$file.sep))
 
 write_csv(TargetProteinReport, path = file.path(DataOut,paste(Project, "_TargetProteinReport",".csv",sep = ""),fsep = .Platform$file.sep))
 ```
@@ -776,6 +731,8 @@ for(i in 1:length(PlotList)){
   ggsave(filename = file.path(PlotsPath, paste(Project, "Explore", names(PlotList)[i], ".png", sep = ""), fsep = .Platform$file.sep), device = "png", plot = PlotList[[i]])
 }
 ```
+
+
 ```{r  Getting error- Mireille Tagged}
 #Fcp6PsbAData <- TargetProteinReport %>%
 #  group_by(Sample, Target) %>%
@@ -1009,7 +966,6 @@ for(i in 1:nrow(CombinationMatrix)) {
 }
 
 ```
-
 
 ```{r save plots for each species}
 for(i in 1:length(PlotList)){

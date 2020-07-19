@@ -1,57 +1,87 @@
 # Shiny app for GreenEdgeProtein
 library(tidyverse)
 library(stats)
+library(shinydashboard)
 
 data <- readRDS("data/GreenEdge_TargetProteinReport_.Rds") %>%
   filter(!is.na("Stress_h"))
 
 # User interface ----
-ui <- fluidPage(
-  #titlePanel("GreenEdgeProtein"),
-  
-  sidebarLayout(
-    sidebarPanel(
-      #helpText("Interactive plotting of GreenEdgeProtein quantification results."),
+ui <- dashboardPage(
+  dashboardHeader(title = "GreenEdgeProtein"),
+  dashboardSidebar(
+    width = 500,
+    fluidRow(
+      box(background = "black",
+          selectInput("xaxis", 
+                      label = "X axis",
+                      choices = c("Growth_uE", "Stress_h"),
+                      selected = "Stress_h")
+      ),
+      box(
+        background = "black",
+        selectInput("yaxis", 
+                    label = "Y axis",
+                    choices = c("fmol_ugTotalProtein", "fmol_mL", "fmol_ugChla"),
+                    selected = "fmol_ugTotalProtein")
+      )
       
-      selectInput("xaxis", 
-                  label = "Choose x axis",
-                  choices = c("Growth_uE", "Stress_h"),
-                  selected = "Stress_h"),
+    ),
+    
+    fluidRow(
+      box(
+          background = "black",
+          selectInput("target", 
+                      label = "Target",
+                      choices = unique(data$Target),
+                      selected = "PsbA")
+          ),
       
-      selectInput("yaxis", 
-                  label = "Choose y axis (normalize method)",
-                  choices = c("fmol_ugTotalProtein", "fmol_mL", "fmol_ugChla"),
-                  selected = "fmol_ugTotalProtein"),
+      box(title = "Species",
+          background = "black",
+          checkboxGroupInput("species", 
+                             NULL, 
+                             choices = setNames(as.list(unique(data$Sp)), unique(data$Sp)),
+                             selected = unique(data$Sp))
+      )
+          
+      ),
+    fluidRow(
+      box(
+        background = "black",
       
-      selectInput("target", 
-                  label = "Choose target",
-                  choices = unique(data$Target),
-                  selected = "PsbA"),
       
-      checkboxGroupInput("species", 
-                         h3("Choose species"), 
-                         choices = setNames(as.list(unique(data$Sp)), unique(data$Sp)),
-                         selected = unique(data$Sp)),
       checkboxGroupInput("sheet", 
                          h3("ChlA Sheet Name"), 
                          choices = setNames(as.list(unique(data$TotalChlaSheetName)), unique(data$TotalChlaSheetName)),
-                         selected = unique(data$TotalChlaSheetName)),
-      
-      selectInput("color",
-                  label = "Choose color",
-                  choices = c("Sp", "Inhibitor", "None"),
-                  selected = "None"),
-      
+                         selected = unique(data$TotalChlaSheetName))
+      ),
+      box(
+        background = "black",
+        selectInput("color",
+                    label = "Choose color",
+                    choices = c("Sp", "Inhibitor", "None"),
+                    selected = "None")
+        ),
+      box(
+        background = "black",
       selectInput("facet",
                   label = "Choose facet",
                   choices = c("Sp", "Inhibitor", "None"),
-                  selected = "None"),
+                  selected = "None")
+      )
+    )
+      
+        
       ),
+      
+      
+      
+      
     
-    
-    
-    mainPanel(plotOutput("speciesPlot"))
-  )
+    dashboardBody(plotOutput("speciesPlot"),
+                  height = "5000px"
+                  )
 )
 
 
@@ -85,10 +115,9 @@ server <- function(input, output) {
       #facet_grid(vars(Sp), vars(Inhibitor))+
       theme_bw()+
       ggtitle(paste("Protein Target:", input$target))
+    
   })
 }
-
-
 
 # Run app ----
 shinyApp(ui, server)
