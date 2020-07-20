@@ -102,7 +102,13 @@ SampPrep <- as_tibble(read_excel(file.path("GreenEdgeTargetProteinSamplePrep.xls
 #filter header rows and filter rows of all na
 SampPrep <- SampPrep %>%
   slice(-1,-2) %>%
-  filter_all(any_vars(!is.na(.)))
+  filter_all(any_vars(!is.na(.))) %>%
+  # remove manually entered protein data
+  select(-Rep1TotalProteinExtract_ug_uL, 
+         -Rep2TotalProteinExtract_ug_uL,
+         -Rep3TotalProteinExtract_ug_uL,
+         -AverageTotalProteinExtract_ug_uL,
+         -TotalProteinExtractFileName)
 ```
 
 ```{r tidy metadata}
@@ -411,6 +417,9 @@ BlankSubtracted <- PlateRead %>%
 JoinedProtein <- left_join(Meta, BlankSubtracted, by = c("Well", "PlateBaseName")) %>%
   # If sample starts with "P", classify as Unknown, otherwise classify as Standard
   mutate(SampleType = if_else(grepl("^P", SampleName), "Unknown", "Standard"))
+
+JoinedProtein %>%
+  arrange(SampleName)
 ```
 
 ```{r functions for mapping protein standards}
@@ -461,25 +470,33 @@ for(i in 1:nrow(Nested)) {
   
   ProteinData <- bind_rows(ProteinData, FittedData)
 }
-
+ProteinData
 # drop all negative predicted values 
 # use ifelse not if_else since NA and double are different types 
-ProteinData <- ProteinData %>%
-  mutate(pred = ifelse(pred < 0, NA, pred)) %>%
-  drop_na(pred)
+  
+  
 
 # keep only useful info from plate data
 LongProteinData <- ProteinData %>%
   # only keep samples (starts with P)
   filter(grepl("^P", SampleName)) %>%
+  # check if all 3 replicates are negative
+  group_by(SampleName) %>%
+  mutate(AllNegativeProt = (3 == sum((pred < 0)))) %>%
+  # set replicates as NA if negative
+  mutate(pred = ifelse(pred < 0, NA, pred)) %>%
   # subset columns
-  select(SampleName, "Protein_ug_uL" = pred, PlateBaseName) %>%
+  select(SampleName, "Protein_ug_uL" = pred, PlateBaseName, AllNegativeProt) %>%
   # calculate mean for each sample
   group_by(SampleName) %>%
-  mutate(AvgTotalProt = mean(Protein_ug_uL),
-         StdDev = sd(Protein_ug_uL)) %>%
+  mutate(AvgTotalProt = mean(Protein_ug_uL,
+                             na.rm = TRUE),
+         StdDev = sd(Protein_ug_uL,
+                     na.rm = TRUE)) %>%
   ungroup() %>%
   arrange(SampleName)
+
+LongProteinData
 ```
 
 ```{r long to wide}
@@ -498,7 +515,9 @@ WideProteinData <- LongProteinData %>%
   # rename and select columns
   select(SampleName, TotalProtRep1 = "0", 
          TotalProtRep2 = "1", TotalProtRep3 = "2",
-         AvgTotalProt, CV, StdDev, PlateBaseName)
+         AvgTotalProt, CV, StdDev, PlateBaseName, AllNegativeProt)
+
+WideProteinData
 ```
 
 ```{r join protein data with BlotQuantData}
@@ -507,27 +526,12 @@ BlotQuantData <- BlotQuantData %>%
   left_join(., 
           WideProteinData, 
           by = c("Sample" = "SampleName" )) %>%
-  # merge columns with existing, manually entered total protein data
-  unite("Rep1TotalProteinExtract_ug_uL", 
-        Rep1TotalProteinExtract_ug_uL,
-        TotalProtRep1,
-        remove = TRUE, na.rm = TRUE) %>%
-  unite("Rep2TotalProteinExtract_ug_uL", 
-        Rep2TotalProteinExtract_ug_uL,
-        TotalProtRep2,
-        remove = TRUE, na.rm = TRUE) %>%
-  unite("Rep3TotalProteinExtract_ug_uL", 
-        Rep3TotalProteinExtract_ug_uL,
-        TotalProtRep3,
-        remove = TRUE, na.rm = TRUE) %>%
-  type_convert() %>%
-  mutate(AverageTotalProteinExtract_ug_uL = coalesce(AvgTotalProt,
-                                                     AverageTotalProteinExtract_ug_uL)
-         )%>%
-  unite("TotalProteinExtractFileName", 
-        TotalProteinExtractFileName,
-        PlateBaseName,
-        remove = TRUE, na.rm = TRUE) %>%
+  # rename protein columns to fit with later format
+  rename(Rep1TotalProteinExtract_ug_uL = TotalProtRep1,
+         Rep2TotalProteinExtract_ug_uL = TotalProtRep2,
+         Rep3TotalProteinExtract_ug_uL = TotalProtRep3,
+         AverageTotalProteinExtract_ug_uL = AvgTotalProt,
+         TotalProteinExtractFileName = PlateBaseName) %>%
   # re-parse to read as numeric
   type_convert() %>%
   arrange(Sample) %>%
@@ -640,6 +644,7 @@ TargetProteinReport <- BlotQuantData %>%
          fmol_ugTotalProtein,
          QuantModel,
         Flag,
+        AllNegativeProt,
         SamplePrepComments,
         TotalProteinExtract_ug,
         TotalChlaExtract_ug,

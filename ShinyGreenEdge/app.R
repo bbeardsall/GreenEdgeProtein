@@ -3,7 +3,7 @@ library(tidyverse)
 library(stats)
 library(shinydashboard)
 
-choiceVariables <- c("Sp", "Inhibitor", "CultureId", "BlotId", "None")
+choiceVariables <- c("Sp", "Inhibitor", "CultureId", "BlotId", "AllNegativeProt", "Flag", "None")
 
 data <- readRDS("data/GreenEdge_TargetProteinReport_.Rds") %>%
   filter(!is.na("Stress_h"))
@@ -156,8 +156,8 @@ server <- function(input, output) {
           geom_point(aes(
             x = !!xaxisSym,
             y = !!yaxisSym,
-            color = !!colorSym,
-            shape = !!shapeSym
+            color = as.factor(!!colorSym),
+            shape = as.factor(!!shapeSym)
           ),
           size = input$size)
         }
@@ -165,14 +165,14 @@ server <- function(input, output) {
           geom_point(aes(
             x = !!xaxisSym,
             y = !!yaxisSym,
-            color = !!colorSym
+            color = as.factor(!!colorSym)
           ))
         }
         else if (input$shape != "None") {
           geom_point(aes(
             x = !!xaxisSym,
             y = !!yaxisSym,
-            shape = !!shapeSym
+            shape = as.factor(!!shapeSym)
           ),
           size = input$size)
         }
