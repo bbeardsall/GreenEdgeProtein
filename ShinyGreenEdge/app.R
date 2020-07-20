@@ -3,8 +3,6 @@ library(tidyverse)
 library(stats)
 library(shinydashboard)
 
-##### Change to shiny directory before deploying!! #####
-
 choiceVariables <- c("Sp", "Inhibitor", "CultureId", "BlotId", "None")
 
 data <- readRDS("data/GreenEdge_TargetProteinReport_.Rds") %>%
@@ -23,7 +21,7 @@ ui <- dashboardPage(
         selectInput(
           "xaxis",
           label = "X axis",
-          choices = c("Growth_uE", "Stress_h"),
+          choices = c("Growth_uE", "Stress_h", "TotalProteinExtract_ug", "TotalChlaExtract_ug"),
           selected = "Stress_h"
         )
       ),
@@ -32,7 +30,7 @@ ui <- dashboardPage(
         selectInput(
           "yaxis",
           label = "Y axis",
-          choices = c("fmol_ugTotalProtein", "fmol_mL", "fmol_ugChla"),
+          choices = c("fmol_ugTotalProtein", "fmol_mL", "fmol_ugChla","TotalProteinExtract_ug", "TotalChlaExtract_ug"),
           selected = "fmol_ugTotalProtein"
         )
       )
@@ -44,7 +42,7 @@ ui <- dashboardPage(
         sliderInput(
           "size",
           label = "Size",
-          min = 0, max = 5, value = 0.5,
+          min = 0, max = 5, value = 2,
           step = 0.5
         )
       ),
