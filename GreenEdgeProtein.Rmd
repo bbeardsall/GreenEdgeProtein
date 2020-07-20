@@ -7,8 +7,6 @@ date: "`r format(Sys.Date())`"
 Changes for Brian to implement:
 - Fcp6SpeciesPlot aMean fmol_ugChlA (do for all all targets) (confirm if up to date)
 - look through notes
-- ran out of shapes (line 792)
-- line 796 keep old 
 - shiny interactive plot
   - species
   - blot id
@@ -105,8 +103,6 @@ SampPrep <- as_tibble(read_excel(file.path("GreenEdgeTargetProteinSamplePrep.xls
 SampPrep <- SampPrep %>%
   slice(-1,-2) %>%
   filter_all(any_vars(!is.na(.)))
-
-Catalog
 ```
 
 ```{r tidy metadata}
@@ -135,7 +131,6 @@ Catalog <- Catalog %>%
          Stress_h = as.numeric(
            recode(Stress_h, "1R" = "3"))
   )
-Catalog
 ```
 
 ```{r merge SampPrep with Catalog}
@@ -201,7 +196,6 @@ BlotData <- BlotData %>%
 ```{r merge data with metadata}
 BlotData <- left_join(x = BlotData, y = SampPrepCatalog, by = c("Sample" = "Sample", "BlotId" = "BlotId" ))
 ```
-
 
 ```{r plot standards}
 StandardsPlot <- BlotData %>%
@@ -277,7 +271,6 @@ BlotPredict <- BlotFits %>%
          ExpFit = `.fitted...13`) %>%
    select(-c(FitLin, TidiedLin, ParamLin, FitExp, TidiedExp, ParamExp))
 
-          
 BlotLinParam <- BlotFits %>% 
   unnest_wider(col = TidiedLin) %>%
   select(-c(data, FitLin, PredictLin, ParamLin, PredictExp, ParamExp, TidiedExp, FitExp))
@@ -333,7 +326,6 @@ BlotQuantData <- BlotQuantData %>%
   mutate(Exp_fmol_lane = (ExpIntercept * exp(AdjVolInt * Mu))) %>%
   select(Sample, Type, AdjVolInt, AbsQuant_fmol, Lin_fmol_lane, Exp_fmol_lane,  everything())
 
-
 #Mireille modified to flag (1) fmole_lane within 10% outside standard curve, (0) if greater than 10% outside standard range..
 BlotQuantData <- BlotQuantData %>%
   group_by(Filename) %>%
@@ -341,7 +333,6 @@ BlotQuantData <- BlotQuantData %>%
     ExpFlag = if_else(min(as.numeric(Sample[Type == "Standard"]) - min(as.numeric(Sample[Type == "Standard"]) * FlagRange)) < Exp_fmol_lane & max(as.numeric(Sample[Type == "Standard"]) * (1 + FlagRange)) > Exp_fmol_lane, 1, 0),
     LinFlag = if_else(min(as.numeric(Sample[Type == "Standard"]) - min(as.numeric(Sample[Type == "Standard"]) * FlagRange)) < Lin_fmol_lane & max(as.numeric(Sample[Type == "Standard"]) * (1 + FlagRange)) > Lin_fmol_lane, 1, 0)) %>%
   ungroup()
-
 
 BlotQuantData <- BlotQuantData %>%
   select(ExpFlag, LinFlag, everything()) %>%
@@ -352,8 +343,6 @@ BlotQuantData <- BlotQuantData %>%
 #  mutate(lin_fmol_lane = (Adj_Vol_Int * estimate[[1]][1]) + estimate[[1]][2]) %>%
 #  select(Label, Type, Adj_Vol_Int, Abs_Quant_fmol, lin_fmol_lane, everything())
 ```
-
-
 
 # Get Total Protein Data
 
@@ -416,17 +405,15 @@ BlankSubtracted <- PlateRead %>%
   pivot_wider(names_from = WellType, values_from = Value, names_prefix = "Value") %>%
   # subtract blank from each sample
   mutate(BlankSubtractedValue = ValueSample - ValueBlank)
-
 ```
 
 ```{r join plate values with metadata}
 JoinedProtein <- left_join(Meta, BlankSubtracted, by = c("Well", "PlateBaseName")) %>%
   # If sample starts with "P", classify as Unknown, otherwise classify as Standard
   mutate(SampleType = if_else(grepl("^P", SampleName), "Unknown", "Standard"))
-
 ```
 
-```{r functions for mapping}
+```{r functions for mapping protein standards}
 FilterStds <- function(Data) {
   Data %>%
     filter(SampleType == "Standard") %>%
@@ -454,8 +441,6 @@ Nested <- JoinedProtein %>%
   # get r^2 for each model
   mutate(Rsq = map(Model, GetRsq)) %>%
   mutate_at("Rsq", unlist)
-  
-Nested
 ```
 
 ```{r protein conc from absorbance and standard curve models}
@@ -463,8 +448,7 @@ ProteinData <- NULL
 
 # loop through each plate (each row of nested dataframe)
 for(i in 1:nrow(Nested)) {
-  # get data and model from current row
-  # need to extract with [[]] since in a list
+  # get data and model from current row, need to extract with [[]] since in a list
   Data <- Nested$data[i][[1]]
   Model <- Nested$Model[i][[1]]
   
@@ -499,8 +483,7 @@ LongProteinData <- ProteinData %>%
 ```
 
 ```{r long to wide}
-# pivot long data to wide
-# column for each replicate
+# pivot long data to wide, column for each replicate
 WideProteinData <- LongProteinData %>%
   # rename duplicate entries, append .# to end
   mutate(across(SampleName, make.unique, sep = "___")) %>%
@@ -871,30 +854,6 @@ LinePlot
 
 ggsave("Plots/LinePlot.png")
   
-
-  
-```
-
-```{r no natalie, frag, forced int }
-lm(TotalProteinExtract_ug ~ 0 + TotalChlaExtract_ug, data = Data)
-```
-
-```{r with natalie forced int }
-lm(TotalProteinExtract_ug ~ 0 + TotalChlaExtract_ug, data = Data)
-```
-
-```{r no natalie forced int }
-lm(TotalProteinExtract_ug ~ 0 + TotalChlaExtract_ug, data = Data)
-```
-```{r no natalie, frag, unforced int }
-lm(TotalProteinExtract_ug ~ TotalChlaExtract_ug, data = Data)
-```
-
-```{r with Natalie unforced int}
-lm(TotalProteinExtract_ug ~ TotalChlaExtract_ug, data = Data)
-```
-```{r no Natalie unforced int}
-lm(TotalProteinExtract_ug ~ TotalChlaExtract_ug, data = Data)
 ```
 
 Next want to do the same light stress plots, but for each species.
