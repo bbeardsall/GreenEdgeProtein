@@ -100,7 +100,7 @@ server <- function(input, output) {
     FacetSym <- sym(input$facet)
     xaxisSym <- sym(input$xaxis)
     
-    ggplot(finalData()) +
+    plot <- ggplot(finalData()) +
       {if(input$color != "None"){
         geom_point(aes(x = !!xaxisSym, y = !!yaxisSym, color = !!ColorSym))
         }
