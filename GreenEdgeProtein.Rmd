@@ -11,6 +11,7 @@ Changes for Brian to implement:
   - species
   - blot id
   - Dany excel tab
+- change plate read - unknown if not number (don't start with P)
 
 This .Rmd RNotebook imports a metadata Catalog  with information on samples.
 
@@ -665,7 +666,7 @@ write_csv(TargetProteinReport, path = file.path(DataOut,paste(Project, "_TargetP
 
 ```{r plot protein quant vs. growth light}
 # List target proteins, which conditions to plot, protein normalize methods
-Targets <- c("RbcL", "FtsH", "Fcp6", "PsbA")
+Targets <- ProteinTargets
 Condition <- "Growth_uE"
 NormalizeMethods <- c("fmol_mL", "fmol_ugChla", "fmol_ugTotalProtein")
 
@@ -721,28 +722,12 @@ for(i in 1:length(PlotList)){
 ```
 
 
-```{r  Getting error- Mireille Tagged}
-#Fcp6PsbAData <- TargetProteinReport %>%
-#  group_by(Sample, Target) %>%
-#  pivot_wider(id_cols = Sample, names_from = Target, values_from = fmol_ugTotalProtein) %>%
- # mutate(PsbA_Fcp6 = PsbA / Fcp6) %>%
- # select(Sample, PsbA_Fcp6)
 
-#Fcp6PsbAData
-```
 
-```{r  Getting error- Mireille Tagged}
-#TargetProteinReport %>%
-#  left_join(., Fcp6PsbAData, by = "Sample") %>%
-#  filter(Exp != "Nf_Growth_vs.IceCamp",
-#         PsbA_Fcp6 > 100) %>%
- # ggplot(.) +
- # geom_point(aes(x = TotalChlaExtract_ug, y = PsbA_Fcp6, colour = CultureId, shape = Sp))
-```
 MIrielle removed shape from wrap as there are too many now
 ```{r plot protein quant vs. experimental conditions}
 # List target proteins, which conditions to plot, protein normalize methods
-Targets <- c("Fcp6", "PsbA", "FtsH" )
+Targets <- ProteinTargets
 Conditions <- c("Stress_h", "Stress_h", "Stress_h")
 NormalizeMethods <- c("fmol_mL", "fmol_ugChla", "fmol_ugTotalProtein", "TotalProteinExtract_ug", "TotalChlaExtract_ug", "ProtChlorRatio")
 
