@@ -4,14 +4,10 @@ library(stats)
 library(shinydashboard)
 
 choiceVariables <- c("Sp", "Inhibitor", "CultureId", "BlotId", "AllNegativeProt", "Flag", "None")
-
+axisVariables <- 
 data <- readRDS("data/GreenEdge_TargetProteinReport_.Rds") %>%
   filter(!is.na("Stress_h"))
 
-# User interface ----
-#Add protein targets as possible selections for X axis variables
-#Could pivot wider to put each protein target in its own target?
-#Or something smarter?
 
 ui <- dashboardPage(
   
@@ -25,7 +21,7 @@ ui <- dashboardPage(
         selectInput(
           "xaxis",
           label = "X axis",
-          choices = c("Growth_uE", "Stress_h", "TotalProteinExtract_ug", "TotalChlaExtract_ug"),
+          choices = c("Growth_uE", "Stress_h", "TotalProteinExtract_ug", "TotalChlaExtract_ug", unique(data$Target)),
           selected = "Stress_h"
         )
       ),
@@ -34,12 +30,11 @@ ui <- dashboardPage(
         selectInput(
           "yaxis",
           label = "Y axis",
-          choices = c("fmol_ugTotalProtein", "fmol_mL", "fmol_ugChla","TotalProteinExtract_ug", "TotalChlaExtract_ug"),
+          choices = c("fmol_ugTotalProtein", "fmol_mL", "fmol_ugChla","TotalProteinExtract_ug", "TotalChlaExtract_ug", unique(data$Target)),
           selected = "fmol_ugTotalProtein"
         )
       )
     ),
-    
     fluidRow(
       box(
         background = "black",
@@ -58,6 +53,15 @@ ui <- dashboardPage(
           choices = unique(data$Target),
           selected = "PsbA"
         )
+      )
+    ),
+    fluidRow(
+      box(
+        background = "black",
+        radioButtons("plotType", label = "Plot Type",
+                     choices = list("Single Target" = 1, "Compare Targets" = 2), 
+                     selected = 1
+                     )
       ),
       box(
         background = "black",
@@ -67,25 +71,9 @@ ui <- dashboardPage(
           choices = choiceVariables,
           selected = "None"
         )
-      ),
-      # box(
-      #   background = "black",
-      #   selectInput(
-      #     "facetWrap",
-      #     label = "Choose facet wrap",
-      #     choices = choiceVariables,
-      #     selected = "None"
-      #   )
-      # ),
-      # box(
-      #   background = "black",
-      #   selectInput(
-      #     "shape",
-      #     label = "Choose shape",
-      #     choices = choiceVariables,
-      #     selected = "None"
-      #   )
-      # ),
+      )
+    ),
+    fluidRow(
       box(
         background = "black",
         selectInput(
@@ -136,39 +124,59 @@ ui <- dashboardPage(
 
 # Server logic ----
 server <- function(input, output) {
-  finalData <- reactive({
+  filterData <- reactive({
     data %>%
-      filter(Target == input$target,
-             Sp %in% input$species,
+      filter(Sp %in% input$species,
              TotalChlaSheetName %in% input$sheet)
+  })
+  
+  finalData <- reactive({
+    filterData() %>%
+      filter(Target == input$target)
+  })
+  
+  compareData <- reactive({
+    filterData() %>%
+      pivot_wider(id_cols = c(Stress_h, Inhibitor, Sp, CultureId), 
+                  names_from = Target, 
+                  values_from = fmol_ugChla)
   })
   
   output$speciesPlot <- renderPlot({
     
-  aesInput <- list(x = input$xaxis,
-                   y = input$yaxis,
-                   color = input$color)
-  
-  aesInputFiltered <- lapply(
-    aesInput[aesInput != "None"],
-    sym)
-  
-  facetInput <- c(input$facetX,
-                  input$facetY)
-  
-  facetInputFiltered <- facetInput[facetInput != "None"]
-  
-  ggplot(finalData()) +
-    geom_point(do.call(aes, aesInputFiltered), 
-               size = input$size) +
-    theme_bw() +
-    ggtitle(paste("Protein Target:", input$target)) +
-    if(length(facetInputFiltered) == 1){
-      facet_grid(reformulate(facetInputFiltered))
-    } else if(length(facetInputFiltered) == 2){
-      facet_grid(reformulate(input$facetX, input$facetY))
-    } 
+    aesInput <- list(x = input$xaxis,
+                     y = input$yaxis,
+                     color = input$color)
     
+    aesInputFiltered <- lapply(
+      aesInput[aesInput != "None"],
+      sym)
+    
+    facetInput <- c(input$facetX,
+                    input$facetY)
+    
+    facetInputFiltered <- facetInput[facetInput != "None"]
+    
+    if(input$plotType == 1){
+      ggplot(finalData()) +
+        geom_point(do.call(aes, aesInputFiltered), 
+                   size = input$size) +
+        theme_bw() +
+        ggtitle(paste("Protein Target:", input$target)) +
+        if(length(facetInputFiltered) == 1){
+          facet_grid(reformulate(facetInputFiltered))
+        } else if(length(facetInputFiltered) == 2){
+          facet_grid(reformulate(input$facetX, input$facetY))
+        } 
+    } else {
+      ggplot(compareData()) +
+        geom_point(do.call(aes, aesInputFiltered), 
+                   size = input$size) +
+        theme_bw() +
+        theme(aspect.ratio = 1) +
+        ggtitle(paste("Compare Targets:", input$yaxis, "vs", input$xaxis)) 
+      
+    }
   })
 }
 
