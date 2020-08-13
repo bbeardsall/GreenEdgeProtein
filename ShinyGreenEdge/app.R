@@ -18,6 +18,24 @@ ui <- dashboardPage(
     fluidRow(
       box(
         background = "black",
+        radioButtons("plotType", label = "Plot Type",
+                     choices = list("Single Target" = 1, "Compare Targets" = 2), 
+                     selected = 1
+        )
+      ),
+      box(
+        background = "black",
+        selectInput(
+          "color",
+          label = "Choose color",
+          choices = choiceVariables,
+          selected = "None"
+        )
+      )
+    ),
+    fluidRow(
+      box(
+        background = "black",
         selectInput(
           "xaxis",
           label = "X axis",
@@ -52,24 +70,6 @@ ui <- dashboardPage(
           label = "Target",
           choices = unique(data$Target),
           selected = "PsbA"
-        )
-      )
-    ),
-    fluidRow(
-      box(
-        background = "black",
-        radioButtons("plotType", label = "Plot Type",
-                     choices = list("Single Target" = 1, "Compare Targets" = 2), 
-                     selected = 1
-                     )
-      ),
-      box(
-        background = "black",
-        selectInput(
-          "color",
-          label = "Choose color",
-          choices = choiceVariables,
-          selected = "None"
         )
       )
     ),
@@ -174,7 +174,7 @@ server <- function(input, output) {
                    size = input$size) +
         theme_bw() +
         theme(aspect.ratio = 1) +
-        ggtitle(paste("Compare Targets:", input$yaxis, "vs", input$xaxis)) 
+        ggtitle(paste("Compare Targets fmol_ugChlA:", input$yaxis, "vs", input$xaxis)) 
       
     }
   })
