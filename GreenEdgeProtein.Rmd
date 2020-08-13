@@ -728,7 +728,9 @@ MIrielle removed shape from wrap as there are too many now
 ```{r plot protein quant vs. experimental conditions}
 # List target proteins, which conditions to plot, protein normalize methods
 Targets <- ProteinTargets
+
 Conditions <- "Stress_h"
+
 NormalizeMethods <- c("fmol_mL", "fmol_ugChla", "fmol_ugTotalProtein", "TotalProteinExtract_ug", "TotalChlaExtract_ug", "ProtChlorRatio")
 
 
