@@ -9,6 +9,10 @@ data <- readRDS("data/GreenEdge_TargetProteinReport_.Rds") %>%
   filter(!is.na("Stress_h"))
 
 # User interface ----
+#Add protein targets as possible selections for X axis variables
+#Could pivot wider to put each protein target in its own target?
+#Or something smarter?
+
 ui <- dashboardPage(
   
   dashboardHeader(title = "GreenEdgeProtein"),
@@ -42,7 +46,7 @@ ui <- dashboardPage(
         sliderInput(
           "size",
           label = "Size",
-          min = 0, max = 5, value = 2,
+          min = 0, max = 5, value = 3.5,
           step = 0.5
         )
       ),
@@ -64,24 +68,24 @@ ui <- dashboardPage(
           selected = "None"
         )
       ),
-      box(
-        background = "black",
-        selectInput(
-          "facetWrap",
-          label = "Choose facet wrap",
-          choices = choiceVariables,
-          selected = "None"
-        )
-      ),
-      box(
-        background = "black",
-        selectInput(
-          "shape",
-          label = "Choose shape",
-          choices = choiceVariables,
-          selected = "None"
-        )
-      ),
+      # box(
+      #   background = "black",
+      #   selectInput(
+      #     "facetWrap",
+      #     label = "Choose facet wrap",
+      #     choices = choiceVariables,
+      #     selected = "None"
+      #   )
+      # ),
+      # box(
+      #   background = "black",
+      #   selectInput(
+      #     "shape",
+      #     label = "Choose shape",
+      #     choices = choiceVariables,
+      #     selected = "None"
+      #   )
+      # ),
       box(
         background = "black",
         selectInput(
@@ -140,65 +144,31 @@ server <- function(input, output) {
   })
   
   output$speciesPlot <- renderPlot({
-    xaxisSym <- sym(input$xaxis)
-    yaxisSym <- sym(input$yaxis)
-    colorSym <- sym(input$color)
-    shapeSym <- sym(input$shape)
-    facetWrapSym <- sym(input$facetWrap)
-    facetXSym <- sym(input$facetX)
-    facetYSym <- sym(input$facetY)
-    shapeSym <- sym(input$shape)
-    #sizeSym <- sym(as.character(input$size))
     
-    ggplot(finalData()) +
-      {
-        if (input$color != "None" & input$shape != "None") {
-          geom_point(aes(
-            x = !!xaxisSym,
-            y = !!yaxisSym,
-            color = as.factor(!!colorSym),
-            shape = as.factor(!!shapeSym)
-          ),
-          size = input$size)
-        }
-        else if (input$color != "None") {
-          geom_point(aes(
-            x = !!xaxisSym,
-            y = !!yaxisSym,
-            color = as.factor(!!colorSym)
-          ))
-        }
-        else if (input$shape != "None") {
-          geom_point(aes(
-            x = !!xaxisSym,
-            y = !!yaxisSym,
-            shape = as.factor(!!shapeSym)
-          ),
-          size = input$size)
-        }
-        else{
-          geom_point(aes(x = !!xaxisSym, y = !!yaxisSym),
-                     size = input$size)
-        }
-      } +
-      {
-        if (input$facetWrap != "None") {
-          facet_wrap(vars(!!facetWrapSym))
-        }
-        else {
-          if (input$facetX != "None" & input$facetY != "None") {
-            facet_grid(vars(!!facetXSym), vars(!!facetYSym))
-          }
-          else if (input$facetX != "None") {
-            facet_grid(rows = vars(!!facetXSym))
-          }
-          else if (input$facetY != "None") {
-            facet_grid(cols = vars(!!facetYSym))
-          }
-        }
-      } +
-      theme_bw() +
-      ggtitle(paste("Protein Target:", input$target))
+  aesInput <- list(x = input$xaxis,
+                   y = input$yaxis,
+                   color = input$color)
+  
+  aesInputFiltered <- lapply(
+    aesInput[aesInput != "None"],
+    sym)
+  
+  facetInput <- c(input$facetX,
+                  input$facetY)
+  
+  facetInputFiltered <- facetInput[facetInput != "None"]
+  
+  ggplot(finalData()) +
+    geom_point(do.call(aes, aesInputFiltered), 
+               size = input$size) +
+    theme_bw() +
+    ggtitle(paste("Protein Target:", input$target)) +
+    if(length(facetInputFiltered) == 1){
+      facet_grid(reformulate(facetInputFiltered))
+    } else if(length(facetInputFiltered) == 2){
+      facet_grid(reformulate(input$facetX, input$facetY))
+    } 
+    
   })
 }
 
