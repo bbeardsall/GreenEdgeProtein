@@ -7,12 +7,11 @@ date: "`r format(Sys.Date())`"
 Changes for Brian to implement:
 - Fcp6SpeciesPlot aMean fmol_ugChlA (do for all all targets) (confirm if up to date)
 - look through notes
-- ran out of shapes (line 792)
-- line 796 keep old 
 - shiny interactive plot
   - species
   - blot id
   - Dany excel tab
+- change plate read - unknown if not number (don't start with P)
 
 This .Rmd RNotebook imports a metadata Catalog  with information on samples.
 
@@ -104,9 +103,13 @@ SampPrep <- as_tibble(read_excel(file.path("GreenEdgeTargetProteinSamplePrep.xls
 #filter header rows and filter rows of all na
 SampPrep <- SampPrep %>%
   slice(-1,-2) %>%
-  filter_all(any_vars(!is.na(.)))
-
-Catalog
+  filter_all(any_vars(!is.na(.))) %>%
+  # remove manually entered protein data
+  select(-Rep1TotalProteinExtract_ug_uL, 
+         -Rep2TotalProteinExtract_ug_uL,
+         -Rep3TotalProteinExtract_ug_uL,
+         -AverageTotalProteinExtract_ug_uL,
+         -TotalProteinExtractFileName)
 ```
 
 ```{r tidy metadata}
@@ -135,7 +138,6 @@ Catalog <- Catalog %>%
          Stress_h = as.numeric(
            recode(Stress_h, "1R" = "3"))
   )
-Catalog
 ```
 
 ```{r merge SampPrep with Catalog}
@@ -201,7 +203,6 @@ BlotData <- BlotData %>%
 ```{r merge data with metadata}
 BlotData <- left_join(x = BlotData, y = SampPrepCatalog, by = c("Sample" = "Sample", "BlotId" = "BlotId" ))
 ```
-
 
 ```{r plot standards}
 StandardsPlot <- BlotData %>%
@@ -277,7 +278,6 @@ BlotPredict <- BlotFits %>%
          ExpFit = `.fitted...13`) %>%
    select(-c(FitLin, TidiedLin, ParamLin, FitExp, TidiedExp, ParamExp))
 
-          
 BlotLinParam <- BlotFits %>% 
   unnest_wider(col = TidiedLin) %>%
   select(-c(data, FitLin, PredictLin, ParamLin, PredictExp, ParamExp, TidiedExp, FitExp))
@@ -333,7 +333,6 @@ BlotQuantData <- BlotQuantData %>%
   mutate(Exp_fmol_lane = (ExpIntercept * exp(AdjVolInt * Mu))) %>%
   select(Sample, Type, AdjVolInt, AbsQuant_fmol, Lin_fmol_lane, Exp_fmol_lane,  everything())
 
-
 #Mireille modified to flag (1) fmole_lane within 10% outside standard curve, (0) if greater than 10% outside standard range..
 BlotQuantData <- BlotQuantData %>%
   group_by(Filename) %>%
@@ -341,7 +340,6 @@ BlotQuantData <- BlotQuantData %>%
     ExpFlag = if_else(min(as.numeric(Sample[Type == "Standard"]) - min(as.numeric(Sample[Type == "Standard"]) * FlagRange)) < Exp_fmol_lane & max(as.numeric(Sample[Type == "Standard"]) * (1 + FlagRange)) > Exp_fmol_lane, 1, 0),
     LinFlag = if_else(min(as.numeric(Sample[Type == "Standard"]) - min(as.numeric(Sample[Type == "Standard"]) * FlagRange)) < Lin_fmol_lane & max(as.numeric(Sample[Type == "Standard"]) * (1 + FlagRange)) > Lin_fmol_lane, 1, 0)) %>%
   ungroup()
-
 
 BlotQuantData <- BlotQuantData %>%
   select(ExpFlag, LinFlag, everything()) %>%
@@ -352,8 +350,6 @@ BlotQuantData <- BlotQuantData %>%
 #  mutate(lin_fmol_lane = (Adj_Vol_Int * estimate[[1]][1]) + estimate[[1]][2]) %>%
 #  select(Label, Type, Adj_Vol_Int, Abs_Quant_fmol, lin_fmol_lane, everything())
 ```
-
-
 
 # Get Total Protein Data
 
@@ -403,8 +399,6 @@ for(MetaFile in MetaFiles){
     Meta <- bind_rows(Meta, Data)
   }
 }
-
-Meta
 ```
 
 ```{r subtract blanks}
@@ -418,8 +412,6 @@ BlankSubtracted <- PlateRead %>%
   pivot_wider(names_from = WellType, values_from = Value, names_prefix = "Value") %>%
   # subtract blank from each sample
   mutate(BlankSubtractedValue = ValueSample - ValueBlank)
-
-BlankSubtracted
 ```
 
 ```{r join plate values with metadata}
@@ -427,10 +419,11 @@ JoinedProtein <- left_join(Meta, BlankSubtracted, by = c("Well", "PlateBaseName"
   # If sample starts with "P", classify as Unknown, otherwise classify as Standard
   mutate(SampleType = if_else(grepl("^P", SampleName), "Unknown", "Standard"))
 
-JoinedProtein
+JoinedProtein %>%
+  arrange(SampleName)
 ```
 
-```{r functions for mapping}
+```{r functions for mapping protein standards}
 FilterStds <- function(Data) {
   Data %>%
     filter(SampleType == "Standard") %>%
@@ -458,8 +451,6 @@ Nested <- JoinedProtein %>%
   # get r^2 for each model
   mutate(Rsq = map(Model, GetRsq)) %>%
   mutate_at("Rsq", unlist)
-  
-Nested
 ```
 
 ```{r protein conc from absorbance and standard curve models}
@@ -467,8 +458,7 @@ ProteinData <- NULL
 
 # loop through each plate (each row of nested dataframe)
 for(i in 1:nrow(Nested)) {
-  # get data and model from current row
-  # need to extract with [[]] since in a list
+  # get data and model from current row, need to extract with [[]] since in a list
   Data <- Nested$data[i][[1]]
   Model <- Nested$Model[i][[1]]
   
@@ -481,23 +471,29 @@ for(i in 1:nrow(Nested)) {
   
   ProteinData <- bind_rows(ProteinData, FittedData)
 }
-
+ProteinData
 # drop all negative predicted values 
 # use ifelse not if_else since NA and double are different types 
-ProteinData <- ProteinData %>%
-  mutate(pred = ifelse(pred < 0, NA, pred)) %>%
-  drop_na(pred)
+  
+  
 
 # keep only useful info from plate data
 LongProteinData <- ProteinData %>%
   # only keep samples (starts with P)
   filter(grepl("^P", SampleName)) %>%
+  # check if all 3 replicates are negative
+  group_by(SampleName) %>%
+  mutate(AllNegativeProt = (3 == sum((pred < 0)))) %>%
+  # set replicates as NA if negative
+  mutate(pred = ifelse(pred < 0, NA, pred)) %>%
   # subset columns
-  select(SampleName, "Protein_ug_uL" = pred, PlateBaseName) %>%
+  select(SampleName, "Protein_ug_uL" = pred, PlateBaseName, AllNegativeProt) %>%
   # calculate mean for each sample
   group_by(SampleName) %>%
-  mutate(AvgTotalProt = mean(Protein_ug_uL),
-         StdDev = sd(Protein_ug_uL)) %>%
+  mutate(AvgTotalProt = mean(Protein_ug_uL,
+                             na.rm = TRUE),
+         StdDev = sd(Protein_ug_uL,
+                     na.rm = TRUE)) %>%
   ungroup() %>%
   arrange(SampleName)
 
@@ -505,8 +501,7 @@ LongProteinData
 ```
 
 ```{r long to wide}
-# pivot long data to wide
-# column for each replicate
+# pivot long data to wide, column for each replicate
 WideProteinData <- LongProteinData %>%
   # rename duplicate entries, append .# to end
   mutate(across(SampleName, make.unique, sep = "___")) %>%
@@ -521,25 +516,9 @@ WideProteinData <- LongProteinData %>%
   # rename and select columns
   select(SampleName, TotalProtRep1 = "0", 
          TotalProtRep2 = "1", TotalProtRep3 = "2",
-         AvgTotalProt, CV, StdDev, PlateBaseName)
+         AvgTotalProt, CV, StdDev, PlateBaseName, AllNegativeProt)
 
 WideProteinData
-```
-
-```{r}
-WideProteinData
-```
-
-```{r}
-BlotQuantData %>%
-  filter(Sample == "P71")
-```
-
-```{r}
-test1 <- c("a", "b", "c")
-test2 <- c(NA, "d", "e")
-
-coalesce(test1, test2)
 ```
 
 ```{r join protein data with BlotQuantData}
@@ -548,38 +527,18 @@ BlotQuantData <- BlotQuantData %>%
   left_join(., 
           WideProteinData, 
           by = c("Sample" = "SampleName" )) %>%
-  # merge columns with existing, manually entered total protein data
-  unite("Rep1TotalProteinExtract_ug_uL", 
-        Rep1TotalProteinExtract_ug_uL,
-        TotalProtRep1,
-        remove = TRUE, na.rm = TRUE) %>%
-  unite("Rep2TotalProteinExtract_ug_uL", 
-        Rep2TotalProteinExtract_ug_uL,
-        TotalProtRep2,
-        remove = TRUE, na.rm = TRUE) %>%
-  unite("Rep3TotalProteinExtract_ug_uL", 
-        Rep3TotalProteinExtract_ug_uL,
-        TotalProtRep3,
-        remove = TRUE, na.rm = TRUE) %>%
-  type_convert() %>%
-  mutate(AverageTotalProteinExtract_ug_uL = coalesce(AvgTotalProt,
-                                                     AverageTotalProteinExtract_ug_uL)
-         )%>%
-  unite("TotalProteinExtractFileName", 
-        TotalProteinExtractFileName,
-        PlateBaseName,
-        remove = TRUE, na.rm = TRUE) %>%
+  # rename protein columns to fit with later format
+  rename(Rep1TotalProteinExtract_ug_uL = TotalProtRep1,
+         Rep2TotalProteinExtract_ug_uL = TotalProtRep2,
+         Rep3TotalProteinExtract_ug_uL = TotalProtRep3,
+         AverageTotalProteinExtract_ug_uL = AvgTotalProt,
+         TotalProteinExtractFileName = PlateBaseName) %>%
   # re-parse to read as numeric
   type_convert() %>%
   arrange(Sample) %>%
   mutate(TotalProteinLoaded_ug = AverageTotalProteinExtract_ug_uL * ExtractLoaded_uL,
          TotalProteinExtract_ug = AverageTotalProteinExtract_ug_uL * ExtractVolume_uL,
          TotalChlaExtract_ug = TotalChla_ug)
-  
-  
-BlotQuantData %>%
-  filter(grepl("^P", Sample)) %>%
-  select(Sample, TotalProteinLoaded_ug, ManualTotalProteinLoaded_ug)
 ```
 
 
@@ -615,14 +574,6 @@ BlotQuantData <- BlotQuantData %>%
          Exp_fmol_ugChla = Exp_fmol_lane * 1/as.numeric(ChlaLoaded_ug), na.rm = TRUE)
 ```
 
-```{r}
-BlotQuantData %>%
-  filter(Sample %in% c("P357", "P376", "P379", "P382")) %>%
-  select(Sample, TotalChla_ug, TotalChlaDany_ug, 
-         ChlaLoaded_ug)
-```
-
-
 Mireille added this
 ```{r fmol target per ug total protein}
 BlotQuantData <- BlotQuantData %>%
@@ -637,13 +588,6 @@ BlotQuantData <- BlotQuantData %>%
 mutate(TotalProtein_ug_mLHarvest = as.numeric(AverageTotalProteinExtract_ug_uL) * as.numeric(ExtractVolume_uL)* 1/(`Harvest_mL`), na.rm = TRUE)
 ```
 
-```{r}
-BlotQuantData %>%
-  select(Sample, `Harvest_mL`) %>%
-  filter(Sample == "P71")
-```
-
-
 ```{r save BlotQuantData}
 saveRDS(BlotQuantData, file = file.path(DataOut,paste(Project, "BlotQuantData", ".Rds",sep = "_"),fsep = .Platform$file.sep))
 
@@ -653,10 +597,6 @@ ggsave(filename = file.path(DataOut, paste(Project, "QuantLinPlot.png", sep = "_
 
 ggsave(filename = file.path(DataOut, paste(Project, "QuantExpPlot.png", sep = "_"),fsep = .Platform$file.sep), device = "png", plot = QuantExpPlot)
 ```
-
-
-
-
 
 ```{r compile a condensed report}
 #Filter Samples starting with "P[1-9]" (all samples beginning with "P" followed immediately by a numeral).
@@ -705,6 +645,7 @@ TargetProteinReport <- BlotQuantData %>%
          fmol_ugTotalProtein,
          QuantModel,
         Flag,
+        AllNegativeProt,
         SamplePrepComments,
         TotalProteinExtract_ug,
         TotalChlaExtract_ug,
@@ -716,13 +657,16 @@ TargetProteinReport <- BlotQuantData %>%
 
 saveRDS(TargetProteinReport, file = file.path(DataOut,paste(Project, "TargetProteinReport", ".Rds",sep = "_"),fsep = .Platform$file.sep))
 
+# also save RDS file to shiny folder
+saveRDS(TargetProteinReport, file = file.path("ShinyGreenEdge", "data", paste(Project, "TargetProteinReport", ".Rds",sep = "_"),fsep = .Platform$file.sep))
+
 write_csv(TargetProteinReport, path = file.path(DataOut,paste(Project, "_TargetProteinReport",".csv",sep = ""),fsep = .Platform$file.sep))
 ```
 
 
 ```{r plot protein quant vs. growth light}
 # List target proteins, which conditions to plot, protein normalize methods
-Targets <- c("RbcL", "FtsH", "Fcp6", "PsbA")
+Targets <- ProteinTargets
 Condition <- "Growth_uE"
 NormalizeMethods <- c("fmol_mL", "fmol_ugChla", "fmol_ugTotalProtein")
 
@@ -776,29 +720,15 @@ for(i in 1:length(PlotList)){
   ggsave(filename = file.path(PlotsPath, paste(Project, "Explore", names(PlotList)[i], ".png", sep = ""), fsep = .Platform$file.sep), device = "png", plot = PlotList[[i]])
 }
 ```
-```{r  Getting error- Mireille Tagged}
-#Fcp6PsbAData <- TargetProteinReport %>%
-#  group_by(Sample, Target) %>%
-#  pivot_wider(id_cols = Sample, names_from = Target, values_from = fmol_ugTotalProtein) %>%
- # mutate(PsbA_Fcp6 = PsbA / Fcp6) %>%
- # select(Sample, PsbA_Fcp6)
 
-#Fcp6PsbAData
-```
 
-```{r  Getting error- Mireille Tagged}
-#TargetProteinReport %>%
-#  left_join(., Fcp6PsbAData, by = "Sample") %>%
-#  filter(Exp != "Nf_Growth_vs.IceCamp",
-#         PsbA_Fcp6 > 100) %>%
- # ggplot(.) +
- # geom_point(aes(x = TotalChlaExtract_ug, y = PsbA_Fcp6, colour = CultureId, shape = Sp))
-```
+
+
 MIrielle removed shape from wrap as there are too many now
 ```{r plot protein quant vs. experimental conditions}
 # List target proteins, which conditions to plot, protein normalize methods
-Targets <- c("Fcp6", "PsbA", "FtsH" )
-Conditions <- c("Stress_h", "Stress_h", "Stress_h")
+Targets <- ProteinTargets
+Conditions <- "Stress_h"
 NormalizeMethods <- c("fmol_mL", "fmol_ugChla", "fmol_ugTotalProtein", "TotalProteinExtract_ug", "TotalChlaExtract_ug", "ProtChlorRatio")
 
 
@@ -810,7 +740,7 @@ PlotCount <- 1
 # loop through target proteins
 for(i in 1:length(Targets)){
   # select corresponding condition
-  Condition <- sym(Conditions[i])
+  Condition <- sym(Conditions)
   
   # format/select data for plotting
   Data <- TargetProteinReport %>%
@@ -829,7 +759,7 @@ for(i in 1:length(Targets)){
                  colour = Inhibitor)) +
       geom_vline(xintercept = 2, color = "red", size = 0.25) +
   # facet wrap if stress_h is on x axis
-      {if(Conditions[i] == "Stress_h")facet_wrap(vars(CultureId))}+
+      {if(Conditions == "Stress_h")facet_wrap(vars(CultureId))}+
       theme_bw() +
       labs(title = paste("Reported", Targets[i], 
                          NormalizeMethods[j], "harvested"))
@@ -837,7 +767,7 @@ for(i in 1:length(Targets)){
   
   # add plot to list, with informative name
   PlotList[[PlotCount]] <- Plot
-  names(PlotList)[PlotCount] <- paste(Targets[i], Conditions[i],
+  names(PlotList)[PlotCount] <- paste(Targets[i], Conditions,
                                             NormalizeMethods[j], sep = "_")
   # advance plot counter
   PlotCount <- PlotCount + 1
@@ -914,30 +844,6 @@ LinePlot
 
 ggsave("Plots/LinePlot.png")
   
-
-  
-```
-
-```{r no natalie, frag, forced int }
-lm(TotalProteinExtract_ug ~ 0 + TotalChlaExtract_ug, data = Data)
-```
-
-```{r with natalie forced int }
-lm(TotalProteinExtract_ug ~ 0 + TotalChlaExtract_ug, data = Data)
-```
-
-```{r no natalie forced int }
-lm(TotalProteinExtract_ug ~ 0 + TotalChlaExtract_ug, data = Data)
-```
-```{r no natalie, frag, unforced int }
-lm(TotalProteinExtract_ug ~ TotalChlaExtract_ug, data = Data)
-```
-
-```{r with Natalie unforced int}
-lm(TotalProteinExtract_ug ~ TotalChlaExtract_ug, data = Data)
-```
-```{r no Natalie unforced int}
-lm(TotalProteinExtract_ug ~ TotalChlaExtract_ug, data = Data)
 ```
 
 Next want to do the same light stress plots, but for each species.
@@ -1009,7 +915,6 @@ for(i in 1:nrow(CombinationMatrix)) {
 }
 
 ```
-
 
 ```{r save plots for each species}
 for(i in 1:length(PlotList)){
